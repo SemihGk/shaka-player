@@ -50,7 +50,7 @@ jasmine.Fetch.install = function() {
   jasmine.Fetch.container_.oldAbortController = window.AbortController;
 
   window.Headers = /** @type {function (new:Headers,
-        (Array<Array<string>>|Headers|IObject<string,string>)=)} */(
+        (!Array<!Array<string>>|Headers|Object<string,string>)=)} */(
       jasmine.Fetch.Headers);
 
   window.AbortController = /** @type {function (new:AbortController)} */
@@ -190,16 +190,15 @@ jasmine.Fetch.AbortController.prototype.abort = function() {
 
 
 /**
- * @param {(Array<Array<string>>|Headers|IObject<string,string>)=} opt_headers
+ * @param {(!Array<!Array<string>>|Headers|Object<string,string>)=} headers
  *
  * @constructor
  * @struct
  */
-jasmine.Fetch.Headers = function(opt_headers) {
+jasmine.Fetch.Headers = function(headers) {
   this.contents = {};
 
-  if (opt_headers) {
-    let headers = opt_headers;
+  if (headers) {
     if (headers instanceof jasmine.Fetch.Headers) {
       // Extract contents, to be read as a generic object below.
       headers = headers.contents;

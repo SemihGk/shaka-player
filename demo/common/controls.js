@@ -146,7 +146,7 @@ ShakaControls.prototype.init = function(castProxy, onError, notifyCastStatus) {
       'input', this.onVolumeInput_.bind(this));
   this.video_.addEventListener(
       'volumechange', this.onVolumeStateChange_.bind(this));
-  // initialize volume display with a fake event
+  // Initialize volume display with a fake event.
   this.onVolumeStateChange_();
 
   this.captionButton_.addEventListener(
@@ -155,7 +155,7 @@ ShakaControls.prototype.init = function(castProxy, onError, notifyCastStatus) {
       'texttrackvisibility', this.onCaptionStateChange_.bind(this));
   this.player_.addEventListener(
       'trackschanged', this.onTracksChange_.bind(this));
-  // initialize caption state with a fake event
+  // Initialize caption state with a fake event.
   this.onCaptionStateChange_();
 
   this.fullscreenButton_.addEventListener(
@@ -201,9 +201,9 @@ ShakaControls.prototype.init = function(castProxy, onError, notifyCastStatus) {
 
 
 /**
- * When mobile device is rotated to landscape layout, and the video is loaded,
- * the demo app goes into fullscreen.
- * Exit fullscreen when the device is rotated to portrait layout.
+ * When a mobile device is rotated to landscape layout, and the video is loaded,
+ * make the demo app go into fullscreen.
+ * Similarly, exit fullscreen when the device is rotated to portrait layout.
  * @private
  */
 ShakaControls.prototype.onScreenRotation_ = function() {
@@ -616,17 +616,20 @@ ShakaControls.prototype.onCastClick_ = function() {
     this.castProxy_.suggestDisconnect();
   } else {
     this.castButton_.disabled = true;
-    // Disable the load button, to prevent the users from trying to load an
-    // asset while the cast proxy is connecting.
+    // Disable the load/unload buttons, to prevent the users from trying to load
+    // an asset while the cast proxy is connecting.
     // That can lead to strange, erratic behavior.
     document.getElementById('loadButton').disabled = true;
+    document.getElementById('unloadButton').disabled = true;
     this.castProxy_.cast().then(function() {
       document.getElementById('loadButton').disabled = false;
+      document.getElementById('unloadButton').disabled = false;
       this.castButton_.disabled = false;
       // Success!
     }.bind(this), function(error) {
       this.castButton_.disabled = false;
       document.getElementById('loadButton').disabled = false;
+      document.getElementById('unloadButton').disabled = false;
       if (error.code != shaka.util.Error.Code.CAST_CANCELED_BY_USER) {
         this.onError_(error);
       }

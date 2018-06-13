@@ -47,7 +47,7 @@ shakaDemo.localVideo_ = null;
 shakaDemo.localPlayer_ = null;
 
 
-/** @private {shakaExtern.SupportType} */
+/** @private {shaka.extern.SupportType} */
 shakaDemo.support_;
 
 
@@ -63,11 +63,16 @@ shakaDemo.hashCanChange_ = false;
 shakaDemo.suppressHashChangeEvent_ = false;
 
 
+/** @private {(number|undefined)} */
+shakaDemo.startTime_ = undefined;
+
+
 /**
  * @private
  * @const {string}
  */
-shakaDemo.mainPoster_ = '//shaka-player-demo.appspot.com/assets/poster.jpg';
+shakaDemo.mainPoster_ =
+    'https://shaka-player-demo.appspot.com/assets/poster.jpg';
 
 
 /**
@@ -75,7 +80,7 @@ shakaDemo.mainPoster_ = '//shaka-player-demo.appspot.com/assets/poster.jpg';
  * @const {string}
  */
 shakaDemo.audioOnlyPoster_ =
-    '//shaka-player-demo.appspot.com/assets/audioOnly.gif';
+    'https://shaka-player-demo.appspot.com/assets/audioOnly.gif';
 
 
 /**
@@ -101,6 +106,8 @@ shakaDemo.init = function() {
   document.getElementById('preferredAudioLanguage').value = language;
   document.getElementById('preferredTextLanguage').value = language;
 
+  document.getElementById('preferredAudioChannelCount').value = '2';
+
   let params = shakaDemo.getParams_();
 
   shakaDemo.setupLogging_();
@@ -125,9 +132,10 @@ shakaDemo.init = function() {
       errorDisplayLink.textContent = error;
     }
 
-    // Disable the load button.
+    // Disable the load/unload buttons.
     let loadButton = document.getElementById('loadButton');
     loadButton.disabled = true;
+    document.getElementById('unloadButton').disabled = true;
 
     // Hide the error message's close button.
     let errorDisplayCloseButton =
@@ -267,6 +275,10 @@ shakaDemo.preBrowserCheckParams_ = function(params) {
   if ('textlang' in params) {
     document.getElementById('preferredTextLanguage').value = params['textlang'];
   }
+  if ('channels' in params) {
+    document.getElementById('preferredAudioChannelCount').value =
+        params['channels'];
+  }
   if ('asset' in params) {
     document.getElementById('manifestInput').value = params['asset'];
   }
@@ -289,6 +301,10 @@ shakaDemo.preBrowserCheckParams_ = function(params) {
   }
   if ('play' in params) {
     document.getElementById('enableLoadOnRefresh').checked = true;
+  }
+  if ('startTime' in params) {
+    // Used manually for debugging start time issues in live streams.
+    shakaDemo.startTime_ = parseInt(params['startTime'], 10);
   }
   // shaka.log is not set if logging isn't enabled.
   // I.E. if using the compiled version of shaka.
@@ -323,6 +339,41 @@ shakaDemo.preBrowserCheckParams_ = function(params) {
 
 
 /**
+ * Decide if a license server from the demo app URI matches the configuration
+ * of a demo asset.
+ *
+ * @param {!shakaAssets.AssetInfo} assetInfo
+ * @param {?string} licenseUri
+ * @return {boolean}
+ * @private
+ */
+shakaDemo.licenseServerMatch_ = function(assetInfo, licenseUri) {
+  // If no license server was specified, assume that this is a match.
+  // This provides backward compatibility and shorter URIs.
+  if (!licenseUri) {
+    return true;
+  }
+
+  // If a server is specified in the URI, but not in the asset, it's not a
+  // match.  It's not clear when this would ever be meaningful, so the decision
+  // not to match is arbitrary.
+  if (licenseUri && !assetInfo.licenseServers) {
+    return false;
+  }
+
+  // Otherwise, it's a match only if the license server in the URI matches what
+  // is in the asset config.
+  for (let k in assetInfo.licenseServers) {
+    if (licenseUri == assetInfo.licenseServers[k]) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+
+/**
  * @param {!Object.<string, string>} params
  * @private
  */
@@ -331,11 +382,13 @@ shakaDemo.postBrowserCheckParams_ = function(params) {
   if ('asset' in params) {
     let assetList = document.getElementById('assetList');
     let assetUri = params['asset'];
+    let licenseUri = params['license'];
     let isDefault = false;
     // Check all options except the last, which is 'custom asset'.
     for (let index = 0; index < assetList.options.length - 1; index++) {
       if (assetList[index].asset &&
-          assetList[index].asset.manifestUri == assetUri) {
+          assetList[index].asset.manifestUri == assetUri &&
+          shakaDemo.licenseServerMatch_(assetList[index].asset, licenseUri)) {
         assetList.selectedIndex = index;
         isDefault = true;
         break;
@@ -512,6 +565,10 @@ shakaDemo.hashShouldChange_ = function() {
   } else {
     params.push('lang=' + audioLang);
   }
+  let channels = document.getElementById('preferredAudioChannelCount').value;
+  if (channels != '2') {
+    params.push('channels=' + channels);
+  }
   if (document.getElementById('logToScreen').checked) {
     params.push('logtoscreen');
   }
@@ -535,9 +592,12 @@ shakaDemo.hashShouldChange_ = function() {
     params.push('play');
   }
 
-  // This parameter must be added manually, so preserve it.
+  // These parameters must be added manually, so preserve them.
   if ('noinput' in oldParams) {
     params.push('noinput');
+  }
+  if (shakaDemo.startTime_ != undefined) {
+    params.push('startTime=' + shakaDemo.startTime_);
   }
 
   // Store values for drm configuration.
@@ -671,9 +731,8 @@ shakaDemo.closeError = function() {
 };
 
 
-// IE 9 fires DOMContentLoaded, and enters the "interactive"
-// readyState, before document.body has been initialized, so wait
-// for window.load.
+// IE 9 fires DOMContentLoaded, and enters the "interactive" readyState, before
+// document.body has been initialized, so wait for window.load.
 if (document.readyState == 'loading' ||
     document.readyState == 'interactive') {
   if (window.attachEvent) {

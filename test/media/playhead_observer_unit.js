@@ -26,9 +26,9 @@ describe('PlayheadObserver', function() {
   let mockMediaSourceEngine;
   /** @type {!shaka.test.FakePresentationTimeline} */
   let timeline;
-  /** @type {shakaExtern.Manifest} */
+  /** @type {shaka.extern.Manifest} */
   let manifest;
-  /** @type {shakaExtern.StreamingConfiguration} */
+  /** @type {shaka.extern.StreamingConfiguration} */
   let config;
 
   /** @type {!jasmine.Spy} */
@@ -70,11 +70,13 @@ describe('PlayheadObserver', function() {
       failureCallback: function() {},
       bufferBehind: 15,
       ignoreTextStreamFailures: false,
+      alwaysStreamText: false,
       useRelativeCueTimestamps: false,
       startAtSegmentBoundary: false,
       smallGapLimit: 0.5,
       jumpLargeGaps: false,
-      durationBackoff: 1
+      durationBackoff: 1,
+      forceTransmuxTS: false
     };
 
     onBuffering = jasmine.createSpy('onBuffering');
@@ -442,11 +444,11 @@ describe('PlayheadObserver', function() {
 
     /**
      * @param {string} name
-     * @param {shakaExtern.TimelineRegionInfo} info
-     * @param {number=} opt_index
+     * @param {shaka.extern.TimelineRegionInfo} info
+     * @param {number=} index
      */
-    function expectTimelineEvent(name, info, opt_index) {
-      let event = onEvent.calls.argsFor(opt_index || 0)[0];
+    function expectTimelineEvent(name, info, index) {
+      let event = onEvent.calls.argsFor(index || 0)[0];
       expect(event.type).toBe(name);
       expect(event.detail).toEqual(info);
       // This should be a copy by reference, not just a value match.
@@ -456,7 +458,7 @@ describe('PlayheadObserver', function() {
     /**
      * @param {number} newTime
      * @param {string} eventName
-     * @param {shakaExtern.TimelineRegionInfo} info
+     * @param {shaka.extern.TimelineRegionInfo} info
      */
     function moveToAndExpectEvent(newTime, eventName, info) {
       video.currentTime = newTime;

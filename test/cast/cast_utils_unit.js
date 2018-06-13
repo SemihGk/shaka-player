@@ -219,7 +219,7 @@ describe('CastUtils', function() {
         const ContentType = shaka.util.ManifestParserUtils.ContentType;
         initObject[ContentType.VIDEO] = fakeVideoStream;
 
-        mediaSourceEngine.init(initObject).then(function() {
+        mediaSourceEngine.init(initObject, false).then(function() {
           return shaka.test.Util.fetch(initSegmentUrl);
         }).then(function(data) {
           return mediaSourceEngine.appendBuffer(ContentType.VIDEO, data,
@@ -248,7 +248,7 @@ describe('CastUtils', function() {
         document.body.removeChild(video);
       });
 
-      it('deserialize into equivalent objects', function() {
+      quarantinedIt('deserialize into equivalent objects', function() {
         let buffered = video.buffered;
 
         // The test is less interesting if the ranges are empty.

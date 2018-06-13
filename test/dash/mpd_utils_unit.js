@@ -152,6 +152,13 @@ describe('MpdUtils', function() {
               '/example/$Time.mp4',
               '1', 2, 3, 4).toString()).toBe('/example/$Time.mp4');
     });
+
+    it('handles non-decimal format specifiers', function() {
+      expect(
+          MpdUtils.fillUriTemplate(
+              '/$Number%05x$_$Number%01X$_$Number%01u$_$Number%01o$.mp4',
+              '', 180, 0, 0).toString()).toBe('/000b4_B4_180_264.mp4');
+    });
   });
 
   describe('createTimeline', function() {
@@ -435,7 +442,7 @@ describe('MpdUtils', function() {
 
     /** @type {!shaka.test.FakeNetworkingEngine} */
     let fakeNetEngine;
-    /** @type {shakaExtern.RetryParameters} */
+    /** @type {shaka.extern.RetryParameters} */
     let retry;
     /** @type {!DOMParser} */
     let parser;
@@ -720,12 +727,12 @@ describe('MpdUtils', function() {
     }
 
     /**
-     * @param {string=} opt_toReplaceOne
-     * @param {string=} opt_toReplaceTwo
+     * @param {string=} toReplaceOne
+     * @param {string=} toReplaceTwo
      * @return {string}
      * @private
      */
-    function inBaseContainer(opt_toReplaceOne, opt_toReplaceTwo) {
+    function inBaseContainer(toReplaceOne = '', toReplaceTwo = '') {
       let format =
           '<Container xmlns="urn:mpeg:dash:schema:mpd:2011" ' +
           'xmlns:xlink="http://www.w3.org/1999/xlink">' +
@@ -735,8 +742,8 @@ describe('MpdUtils', function() {
           '%(toReplaceTwo)s' +
           '</Container>';
       return sprintf(format, {
-        toReplaceOne: opt_toReplaceOne || '',
-        toReplaceTwo: opt_toReplaceTwo || ''});
+        toReplaceOne: toReplaceOne,
+        toReplaceTwo: toReplaceTwo});
     }
 
     function testRequest(baseXMLString) {

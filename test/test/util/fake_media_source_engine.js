@@ -28,13 +28,13 @@ goog.provide('shaka.test.FakeMediaSourceEngine');
  *
  * @param {!Object.<string, shaka.test.FakeMediaSourceEngine.SegmentData>}
  *   segmentData
- * @param {number=} opt_drift Optional drift. Defaults to 0.
+ * @param {number=} drift Optional drift. Defaults to 0.
  *
  * @constructor
  * @struct
  * @extends {shaka.media.MediaSourceEngine}
  */
-shaka.test.FakeMediaSourceEngine = function(segmentData, opt_drift) {
+shaka.test.FakeMediaSourceEngine = function(segmentData, drift) {
   /** @type {!Object.<string, shaka.test.FakeMediaSourceEngine.SegmentData>} */
   this.segmentData = segmentData;
 
@@ -45,7 +45,7 @@ shaka.test.FakeMediaSourceEngine = function(segmentData, opt_drift) {
   this.segments = {};
 
   /** @private {number} */
-  this.drift_ = opt_drift || 0;
+  this.drift_ = drift || 0;
 
   /** @private {!Object.<string, number>} */
   this.timestampOffsets_ = {};
@@ -115,7 +115,7 @@ shaka.test.FakeMediaSourceEngine = function(segmentData, opt_drift) {
 
   /** @type {!jasmine.Spy} */
   this.bufferedAheadOf = jasmine.createSpy('bufferedAheadOf')
-                   .and.callFake(this.bufferedAheadOfImpl_.bind(this));
+                   .and.callFake(this.bufferedAheadOfImpl.bind(this));
 
   /** @type {!jasmine.Spy} */
   this.setStreamProperties = jasmine.createSpy('setStreamProperties')
@@ -220,9 +220,8 @@ shaka.test.FakeMediaSourceEngine.prototype.isBufferedImpl_ =
  * @param {string} type
  * @param {number} start
  * @return {number}
- * @private
  */
-shaka.test.FakeMediaSourceEngine.prototype.bufferedAheadOfImpl_ = function(
+shaka.test.FakeMediaSourceEngine.prototype.bufferedAheadOfImpl = function(
     type, start) {
   if (this.segments[type] === undefined) throw new Error('unexpected type');
 

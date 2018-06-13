@@ -103,7 +103,7 @@ shakaDemo.updateTextTracks_ = function() {
   if (ShakaDemoUtils.isTsContent(shakaDemo.player_)) {
     let option = document.createElement('option');
     option.textContent = 'Default Text';
-    option.selected = shakaDemo.player_.getUseEmbeddedTextTrack();
+    option.selected = shakaDemo.player_.usingEmbeddedTextTrack();
     trackList.appendChild(option);
   }
 };
@@ -111,8 +111,8 @@ shakaDemo.updateTextTracks_ = function() {
 
 /**
  * @param {Element} list
- * @param {!Array.<!shakaExtern.Track>} tracks
- * @param {!string} languageAndRole
+ * @param {!Array.<!shaka.extern.Track>} tracks
+ * @param {string} languageAndRole
  * @private
  */
 shakaDemo.updateTrackOptions_ = function(list, tracks, languageAndRole) {
@@ -127,6 +127,9 @@ shakaDemo.updateTrackOptions_ = function(list, tracks, languageAndRole) {
       if (track.width && track.height) {
         trackInfo += track.width + 'x' + track.height + ', ';
       }
+      if (track.channelsCount) {
+        trackInfo += 'channels: ' + track.channelsCount + ', ';
+      }
       trackInfo += track.bandwidth + ' bits/s';
       return trackInfo;
     } ,
@@ -140,12 +143,12 @@ shakaDemo.updateTrackOptions_ = function(list, tracks, languageAndRole) {
       return trackInfo;
     }
   };
-  // Remove old tracks
+  // Remove old tracks.
   while (list.firstChild) {
     list.removeChild(list.firstChild);
   }
 
-  // Split language and role
+  // Split language and role.
   let res = languageAndRole.split(':');
   let language = res[0];
   let role = res[1] || '';
@@ -207,7 +210,7 @@ shakaDemo.updateAudioLanguages_ = function() {
 /**
  * @param {Element} list
  * @param {!Array.<{language: string, role: string}>} languagesAndRoles
- * @param {!Array.<shakaExtern.Track>} tracks
+ * @param {!Array.<shaka.extern.Track>} tracks
  * @private
  */
 shakaDemo.updateLanguageOptions_ =
@@ -292,7 +295,7 @@ shakaDemo.onTrackSelected_ = function(event) {
   let player = shakaDemo.player_;
 
   if (list.id == 'variantTracks') {
-    // Disable abr manager before changing tracks
+    // Disable abr manager before changing tracks.
     let config = {abr: {enabled: false}};
     player.configure(config);
 

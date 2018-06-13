@@ -50,17 +50,16 @@ shaka.test.FakeAbrManager = function() {
     'getBandwidthEstimate', 'chooseVariant', 'setVariants', 'configure'
   ]);
 
-  /** @type {!Array.<shakaExtern.Variant>} */
-  let variants = [];
+  ret.variants = [];
 
   ret.chooseIndex = 0;
 
   ret.init.and.callFake(function(switchCallback) {
     ret.switchCallback = switchCallback;
   });
-  ret.setVariants.and.callFake(function(arg) { variants = arg; });
+  ret.setVariants.and.callFake(function(arg) { ret.variants = arg; });
   ret.chooseVariant.and.callFake(function() {
-    return variants[ret.chooseIndex];
+    return ret.variants[ret.chooseIndex];
   });
 
   return ret;
@@ -71,7 +70,11 @@ shaka.test.FakeAbrManager = function() {
 shaka.test.FakeAbrManager.prototype.chooseIndex;
 
 
-/** @type {shakaExtern.AbrManager.SwitchCallback} */
+/** @type {!Array.<shaka.extern.Variant>} */
+shaka.test.FakeAbrManager.prototype.variants;
+
+
+/** @type {shaka.extern.AbrManager.SwitchCallback} */
 shaka.test.FakeAbrManager.prototype.switchCallback;
 
 
@@ -166,7 +169,7 @@ shaka.test.FakeDrmEngine.prototype.attach;
 shaka.test.FakeDrmEngine.prototype.getExpiration;
 
 
-/** @param {?shakaExtern.DrmInfo} info */
+/** @param {?shaka.extern.DrmInfo} info */
 shaka.test.FakeDrmEngine.prototype.setDrmInfo;
 
 
@@ -204,7 +207,13 @@ shaka.test.FakeStreamingEngine = function(onChooseStreams, onCanSwitch) {
   ret.getActiveAudio.and.callFake(function() { return activeAudio; });
   ret.getActiveVideo.and.callFake(function() { return activeVideo; });
   ret.getActiveText.and.callFake(function() { return activeText; });
-  ret.loadNewTextStream.and.callFake(resolve);
+  ret.loadNewTextStream.and.callFake(function(stream) {
+    activeText = stream;
+    return Promise.resolve();
+  });
+  ret.unloadTextStream.and.callFake(function() {
+    activeText = null;
+  });
   ret.init.and.callFake(function() {
     let chosen = onChooseStreams();
     return Promise.resolve().then(function() {
@@ -261,9 +270,9 @@ shaka.test.FakeStreamingEngine.prototype.onCanSwitch;
  * Creates a fake manifest parser.
  *
  * @constructor
- * @param {shakaExtern.Manifest} manifest
+ * @param {shaka.extern.Manifest} manifest
  * @struct
- * @implements {shakaExtern.ManifestParser}
+ * @implements {shaka.extern.ManifestParser}
  * @return {!Object}
  */
 shaka.test.FakeManifestParser = function(manifest) {
@@ -301,23 +310,23 @@ shaka.test.FakeManifestParser.prototype.onExpirationUpdated;
 shaka.test.FakeManifestParser.prototype.configure;
 
 
-/** @type {shaka.media.StreamingEngine.PlayerInterface} */
+/** @type {shaka.extern.ManifestParser.PlayerInterface} */
 shaka.test.FakeManifestParser.prototype.playerInterface;
 
 
 
 /**
  * Creates a fake video element.
- * @param {number=} opt_currentTime
+ * @param {number=} currentTime
  *
  * @constructor
  * @struct
  * @extends {HTMLVideoElement}
  * @return {!Object}
  */
-shaka.test.FakeVideo = function(opt_currentTime) {
+shaka.test.FakeVideo = function(currentTime) {
   let video = {
-    currentTime: opt_currentTime || 0,
+    currentTime: currentTime || 0,
     readyState: 0,
     playbackRate: 1,
     volume: 1,

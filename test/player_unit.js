@@ -30,7 +30,7 @@ describe('Player', function() {
   let logWarnSpy;
   /** @type {!jasmine.Spy} */
   let onError;
-  /** @type {shakaExtern.Manifest} */
+  /** @type {shaka.extern.Manifest} */
   let manifest;
   /** @type {number} */
   let periodIndex;
@@ -38,7 +38,7 @@ describe('Player', function() {
   let player;
   /** @type {!shaka.test.FakeAbrManager} */
   let abrManager;
-  /** @type {function():shakaExtern.AbrManager} */
+  /** @type {function():shaka.extern.AbrManager} */
   let abrFactory;
 
   /** @type {!shaka.test.FakeNetworkingEngine} */
@@ -53,7 +53,7 @@ describe('Player', function() {
   let playheadObserver;
   /** @type {!shaka.test.FakeTextDisplayer} */
   let textDisplayer;
-  /** @type {function():shakaExtern.TextDisplayer} */
+  /** @type {function():shaka.extern.TextDisplayer} */
   let textDisplayFactory;
 
   let mediaSourceEngine;
@@ -494,14 +494,33 @@ describe('Player', function() {
         player.load('', 0, factory1).then(function() {
           player.setTextTrackVisibility(true);
           expect(streamingEngine.loadNewTextStream).toHaveBeenCalled();
+          expect(streamingEngine.getActiveText()).not.toBe(null);
         }).catch(fail).then(done);
       });
 
-      it('do not load text stream if caption is invisible', function(done) {
+      it('does not load text stream if caption is invisible', function(done) {
         player.load('', 0, factory1).then(function() {
           player.setTextTrackVisibility(false);
           expect(streamingEngine.loadNewTextStream).not.toHaveBeenCalled();
           expect(streamingEngine.unloadTextStream).toHaveBeenCalled();
+          expect(streamingEngine.getActiveText()).toBe(null);
+        }).catch(fail).then(done);
+      });
+
+      it('loads text stream if alwaysStreamText is set', function(done) {
+        player.setTextTrackVisibility(false);
+        player.configure({streaming: {alwaysStreamText: true}});
+
+        player.load('', 0, factory1).then(function() {
+          expect(streamingEngine.getActiveText()).not.toBe(null);
+
+          player.setTextTrackVisibility(true);
+          expect(streamingEngine.loadNewTextStream).not.toHaveBeenCalled();
+          expect(streamingEngine.unloadTextStream).not.toHaveBeenCalled();
+
+          player.setTextTrackVisibility(false);
+          expect(streamingEngine.loadNewTextStream).not.toHaveBeenCalled();
+          expect(streamingEngine.unloadTextStream).not.toHaveBeenCalled();
         }).catch(fail).then(done);
       });
     });
@@ -609,6 +628,27 @@ describe('Player', function() {
           // Interrupt load().
           player.unload();
           p.resolve();
+        });
+      });
+
+      it('StreamingEngine init w/ exception', function(done) {
+        // Block StreamingEngine init.
+        let p = new shaka.util.PublicPromise();
+        streamingEngine.init.and.returnValue(p);
+
+        player.load('', 0, factory1).then(fail).catch(Util.spyFunc(checkError))
+            .then(done);
+
+        shaka.test.Util.delay(1.5).then(function() {
+          // Make sure we're blocked.
+          expect(streamingEngine.init).toHaveBeenCalled();
+          // Interrupt load().
+          player.unload();
+          // Fail StreamingEngine init with an exception.
+          p.reject(new shaka.util.Error(
+              shaka.util.Error.Severity.CRITICAL,
+              shaka.util.Error.Category.MANIFEST,
+              shaka.util.Error.Code.OPERATION_ABORTED));
         });
       });
     });  // describe('interruption during')
@@ -940,6 +980,53 @@ describe('Player', function() {
           .catch(fail)
           .then(done);
     });
+
+    it('accepts parameters in a (fieldName, value) format', function() {
+      let oldConfig = player.getConfiguration();
+      let oldDelayLicense = oldConfig.drm.delayLicenseRequestUntilPlayed;
+      let oldSwitchInterval = oldConfig.abr.switchInterval;
+      let oldPreferredLang = oldConfig.preferredAudioLanguage;
+
+      expect(oldDelayLicense).toBe(false);
+      expect(oldSwitchInterval).toBe(8);
+      expect(oldPreferredLang).toBe('en');
+
+      player.configure('drm.delayLicenseRequestUntilPlayed', true);
+      player.configure('abr.switchInterval', 10);
+      player.configure('preferredAudioLanguage', 'fr');
+
+      let newConfig = player.getConfiguration();
+      let newDelayLicense = newConfig.drm.delayLicenseRequestUntilPlayed;
+      let newSwitchInterval = newConfig.abr.switchInterval;
+      let newPreferredLang = newConfig.preferredAudioLanguage;
+
+      expect(newDelayLicense).toBe(true);
+      expect(newSwitchInterval).toBe(10);
+      expect(newPreferredLang).toBe('fr');
+    });
+
+    it('accepts escaped "." in names',
+       /** @suppress {accessControls} */ (function() {
+         expect(player.convertToConfigObject_('foo', 1)).toEqual({foo: 1});
+         expect(player.convertToConfigObject_('foo.bar', 1))
+             .toEqual({foo: {bar: 1}});
+         expect(player.convertToConfigObject_('foo..bar', 1))
+             .toEqual({foo: {'': {bar: 1}}});
+         expect(player.convertToConfigObject_('foo.bar.baz', 1))
+             .toEqual({foo: {bar: {baz: 1}}});
+         expect(player.convertToConfigObject_('foo.bar\\.baz', 1))
+             .toEqual({foo: {'bar.baz': 1}});
+         expect(player.convertToConfigObject_('foo.baz.', 1))
+             .toEqual({foo: {baz: {'': 1}}});
+         expect(player.convertToConfigObject_('foo.baz\\.', 1))
+             .toEqual({foo: {'baz.': 1}});
+         expect(player.convertToConfigObject_('foo\\.bar', 1))
+             .toEqual({'foo.bar': 1});
+         expect(player.convertToConfigObject_('.foo', 1))
+             .toEqual({'': {foo: 1}});
+         expect(player.convertToConfigObject_('\\.foo', 1))
+             .toEqual({'.foo': 1});
+       }));
   });
 
   describe('AbrManager', function() {
@@ -1124,61 +1211,88 @@ describe('Player', function() {
   });
 
   describe('tracks', function() {
-    /** @type {!Array.<shakaExtern.Track>} */
+    /** @type {!Array.<shaka.extern.Track>} */
     let variantTracks;
-    /** @type {!Array.<shakaExtern.Track>} */
+    /** @type {!Array.<shaka.extern.Track>} */
     let textTracks;
 
     beforeEach(function(done) {
       // A manifest we can use to test track expectations.
       manifest = new shaka.test.ManifestGenerator()
         .addPeriod(0)
-          .addVariant(1)
-            .bandwidth(200)
+          .addVariant(1)  // main surround, low res
+            .bandwidth(1300)
             .language('en')
-            .addAudio(1).bandwidth(100)
-            .addVideo(4).bandwidth(100).size(100, 200)
-            .frameRate(1000000 / 42000)
-          .addVariant(2)
-            .bandwidth(300)
+            .addVideo(1).bandwidth(1000).size(100, 200)
+              .frameRate(1000000 / 42000)
+            .addAudio(3).bandwidth(300).channelsCount(6).roles(['main'])
+
+          .addVariant(2)  // main surround, high res
+            .bandwidth(2300)
             .language('en')
-            .addAudio(1).bandwidth(100).roles(['main'])
-            .addVideo(5).bandwidth(200).size(200, 400).frameRate(24)
-          .addVariant(3)
-            .bandwidth(200)
+            .addVideo(2).bandwidth(2000).size(200, 400).frameRate(24)
+            .addAudio(3)  // already defined above
+
+          .addVariant(3)  // main stereo, low res
+            .bandwidth(1100)
             .language('en')
-            .addAudio(2).bandwidth(100).roles(['commentary'])
-            .addVideo(4).bandwidth(100).size(100, 200)
-            .frameRate(1000000 / 42000)
-          .addVariant(4)
-            .bandwidth(300)
+            .addVideo(1)  // already defined above
+            .addAudio(4).bandwidth(100).channelsCount(2).roles(['main'])
+
+          .addVariant(4)  // main stereo, high res
+            .bandwidth(2100)
             .language('en')
-            .addAudio(2).bandwidth(100)
-            .addVideo(5).bandwidth(200).size(200, 400).frameRate(24)
-          .addVariant(5)
+            .addVideo(2)  // already defined above
+            .addAudio(4)  // already defined above
+
+          .addVariant(5)  // commentary stereo, low res
+            .bandwidth(1100)
+            .language('en')
+            .addVideo(1)  // already defined above
+            .addAudio(5).bandwidth(100).channelsCount(2).roles(['commentary'])
+
+          .addVariant(6)  // commentary stereo, low res
+            .bandwidth(2100)
+            .language('en')
+            .addVideo(2)  // already defined above
+            .addAudio(5)  // already defined above
+
+          .addVariant(7)  // spanish stereo, low res
             .language('es')
-            .bandwidth(300)
-            .addAudio(8).bandwidth(100)
-            .addVideo(5).bandwidth(200).size(200, 400).frameRate(24)
-          .addTextStream(6)
-            .language('es').label('Spanish')
-            .bandwidth(100).mime('text/vtt')
-            .kind('caption')
-          .addTextStream(7)
-            .language('en').label('English')
-            .bandwidth(100).mime('application/ttml+xml')
-            .kind('caption').roles(['main'])
-           .addTextStream(11)
-            .language('en').label('English')
-            .bandwidth(100).mime('application/ttml+xml')
-            .kind('caption').roles(['commentary'])
+            .bandwidth(1100)
+            .addVideo(1)  // already defined above
+            .addAudio(6).bandwidth(100).channelsCount(2)
+
+          .addVariant(8)  // spanish stereo, high res
+            .language('es')
+            .bandwidth(2100)
+            .addVideo(2)  // already defined above
+            .addAudio(6)  // already defined above
+
           // All text tracks should remain, even with different MIME types.
+          .addTextStream(7)
+            .language('es').label('Spanish')
+            .bandwidth(10).mime('text/vtt')
+            .kind('caption')
+          .addTextStream(8)
+            .language('en').label('English')
+            .bandwidth(10).mime('application/ttml+xml')
+            .kind('caption').roles(['main'])
+           .addTextStream(9)
+            .language('en').label('English')
+            .bandwidth(10).mime('application/ttml+xml')
+            .kind('caption').roles(['commentary'])
         .addPeriod(1)
-          .addVariant(8)
-            .bandwidth(200)
+          .addVariant(9)
+            .bandwidth(1100)
             .language('en')
-            .addAudio(9).bandwidth(100)
-            .addVideo(10).bandwidth(100).size(100, 200)
+            .addVideo(10).bandwidth(1000).size(100, 200)
+            .addAudio(11).bandwidth(100).channelsCount(2)
+          .addVariant(10)
+            .bandwidth(1300)
+            .language('en')
+            .addVideo(10)  // already defined above
+            .addAudio(12).bandwidth(300).channelsCount(6)
         .build();
 
       variantTracks = [
@@ -1186,7 +1300,7 @@ describe('Player', function() {
           id: 1,
           active: true,
           type: 'variant',
-          bandwidth: 200,
+          bandwidth: 1300,
           language: 'en',
           label: null,
           kind: null,
@@ -1199,17 +1313,17 @@ describe('Player', function() {
           videoCodec: 'avc1.4d401f',
           primary: false,
           roles: ['main'],
-          videoId: 4,
-          audioId: 1,
-          channelsCount: null,
-          audioBandwidth: 100,
-          videoBandwidth: 100
+          videoId: 1,
+          audioId: 3,
+          channelsCount: 6,
+          audioBandwidth: 300,
+          videoBandwidth: 1000,
         },
         {
           id: 2,
           active: false,
           type: 'variant',
-          bandwidth: 300,
+          bandwidth: 2300,
           language: 'en',
           label: null,
           kind: null,
@@ -1222,17 +1336,63 @@ describe('Player', function() {
           videoCodec: 'avc1.4d401f',
           primary: false,
           roles: ['main'],
-          videoId: 5,
-          audioId: 1,
-          channelsCount: null,
-          audioBandwidth: 100,
-          videoBandwidth: 200
+          videoId: 2,
+          audioId: 3,
+          channelsCount: 6,
+          audioBandwidth: 300,
+          videoBandwidth: 2000,
         },
         {
           id: 3,
           active: false,
           type: 'variant',
-          bandwidth: 200,
+          bandwidth: 1100,
+          language: 'en',
+          label: null,
+          kind: null,
+          width: 100,
+          height: 200,
+          frameRate: 1000000 / 42000,
+          mimeType: 'video/mp4',
+          codecs: 'avc1.4d401f, mp4a.40.2',
+          audioCodec: 'mp4a.40.2',
+          videoCodec: 'avc1.4d401f',
+          primary: false,
+          roles: ['main'],
+          videoId: 1,
+          audioId: 4,
+          channelsCount: 2,
+          audioBandwidth: 100,
+          videoBandwidth: 1000,
+        },
+        {
+          id: 4,
+          active: false,
+          type: 'variant',
+          bandwidth: 2100,
+          language: 'en',
+          label: null,
+          kind: null,
+          width: 200,
+          height: 400,
+          frameRate: 24,
+          mimeType: 'video/mp4',
+          codecs: 'avc1.4d401f, mp4a.40.2',
+          audioCodec: 'mp4a.40.2',
+          videoCodec: 'avc1.4d401f',
+          primary: false,
+          roles: ['main'],
+          videoId: 2,
+          audioId: 4,
+          channelsCount: 2,
+          audioBandwidth: 100,
+          videoBandwidth: 2000,
+        },
+        {
+          id: 5,
+          active: false,
+          type: 'variant',
+          bandwidth: 1100,
           language: 'en',
           label: null,
           kind: null,
@@ -1245,17 +1405,17 @@ describe('Player', function() {
           videoCodec: 'avc1.4d401f',
           primary: false,
           roles: ['commentary'],
-          videoId: 4,
-          audioId: 2,
-          channelsCount: null,
+          videoId: 1,
+          audioId: 5,
+          channelsCount: 2,
           audioBandwidth: 100,
-          videoBandwidth: 100
+          videoBandwidth: 1000,
         },
         {
-          id: 4,
+          id: 6,
           active: false,
           type: 'variant',
-          bandwidth: 300,
+          bandwidth: 2100,
           language: 'en',
           label: null,
           kind: null,
@@ -1268,17 +1428,40 @@ describe('Player', function() {
           videoCodec: 'avc1.4d401f',
           primary: false,
           roles: ['commentary'],
-          videoId: 5,
-          audioId: 2,
-          channelsCount: null,
+          videoId: 2,
+          audioId: 5,
+          channelsCount: 2,
           audioBandwidth: 100,
-          videoBandwidth: 200
+          videoBandwidth: 2000,
         },
         {
-          id: 5,
+          id: 7,
           active: false,
           type: 'variant',
-          bandwidth: 300,
+          bandwidth: 1100,
+          language: 'es',
+          label: null,
+          kind: null,
+          width: 100,
+          height: 200,
+          frameRate: 1000000 / 42000,
+          mimeType: 'video/mp4',
+          codecs: 'avc1.4d401f, mp4a.40.2',
+          audioCodec: 'mp4a.40.2',
+          videoCodec: 'avc1.4d401f',
+          primary: false,
+          roles: [],
+          videoId: 1,
+          audioId: 6,
+          channelsCount: 2,
+          audioBandwidth: 100,
+          videoBandwidth: 1000,
+        },
+        {
+          id: 8,
+          active: false,
+          type: 'variant',
+          bandwidth: 2100,
           language: 'es',
           label: null,
           kind: null,
@@ -1291,17 +1474,17 @@ describe('Player', function() {
           videoCodec: 'avc1.4d401f',
           primary: false,
           roles: [],
-          videoId: 5,
-          audioId: 8,
-          channelsCount: null,
+          videoId: 2,
+          audioId: 6,
+          channelsCount: 2,
           audioBandwidth: 100,
-          videoBandwidth: 200
-        }
+          videoBandwidth: 2000,
+        },
       ];
 
       textTracks = [
         {
-          id: 6,
+          id: 7,
           active: true,
           type: ContentType.TEXT,
           language: 'es',
@@ -1321,10 +1504,10 @@ describe('Player', function() {
           height: null,
           frameRate: null,
           videoId: null,
-          audioId: null
+          audioId: null,
         },
         {
-          id: 7,
+          id: 8,
           active: false,
           type: ContentType.TEXT,
           language: 'en',
@@ -1344,10 +1527,10 @@ describe('Player', function() {
           height: null,
           frameRate: null,
           videoId: null,
-          audioId: null
+          audioId: null,
         },
         {
-          id: 11,
+          id: 9,
           active: false,
           type: ContentType.TEXT,
           language: 'en',
@@ -1367,19 +1550,20 @@ describe('Player', function() {
           height: null,
           frameRate: null,
           videoId: null,
-          audioId: null
-        }
+          audioId: null,
+        },
       ];
 
       goog.asserts.assert(manifest, 'manifest must be non-null');
       let parser = new shaka.test.FakeManifestParser(manifest);
       let parserFactory = function() { return parser; };
 
-      // Language prefs must be set before load.  Used in select*Language()
-      // tests.
+      // Language/channel prefs must be set before load.  Used in
+      // select*Language() tests.
       player.configure({
         preferredAudioLanguage: 'en',
-        preferredTextLanguage: 'es'
+        preferredTextLanguage: 'es',
+        preferredAudioChannelCount: 6,
       });
 
       player.load('', 0, parserFactory).catch(fail).then(done);
@@ -1422,8 +1606,10 @@ describe('Player', function() {
 
       let config = player.getConfiguration();
       expect(config.abr.enabled).toBe(true);
-      expect(variantTracks[1].type).toBe('variant');
-      player.selectVariantTrack(variantTracks[1]);
+
+      const newTrack = player.getVariantTracks().filter((t) => !t.active)[0];
+      player.selectVariantTrack(newTrack);
+
       config = player.getConfiguration();
       expect(config.abr.enabled).toBe(true);
     });
@@ -1433,8 +1619,10 @@ describe('Player', function() {
 
       let config = player.getConfiguration();
       expect(config.abr.enabled).toBe(true);
-      expect(textTracks[0].type).toBe(ContentType.TEXT);
-      player.selectTextTrack(textTracks[0]);
+
+      const newTrack = player.getTextTracks().filter((t) => !t.active)[0];
+      player.selectTextTrack(newTrack);
+
       config = player.getConfiguration();
       expect(config.abr.enabled).toBe(true);
     });
@@ -1442,32 +1630,29 @@ describe('Player', function() {
     it('switches streams', function() {
       streamingEngine.onCanSwitch();
 
-      let track = variantTracks[3];
-      let variant = manifest.periods[0].variants[3];
-      expect(track.id).toEqual(variant.id);
+      const newTrack = player.getVariantTracks().filter((t) => !t.active)[0];
+      player.selectVariantTrack(newTrack);
 
-      player.selectVariantTrack(track);
-      expect(streamingEngine.switchVariant)
-          .toHaveBeenCalledWith(variant, false);
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      const variant = streamingEngine.switchVariant.calls.argsFor(0)[0];
+      expect(variant.id).toEqual(newTrack.id);
     });
 
     it('still switches streams if called during startup', function() {
       // startup is not complete until onCanSwitch is called.
 
       // pick a track
-      let track = variantTracks[1];
+      const newTrack = player.getVariantTracks().filter((t) => !t.active)[0];
       // ask the player to switch to it
-      player.selectVariantTrack(track);
+      player.selectVariantTrack(newTrack);
       // nothing happens yet
       expect(streamingEngine.switchVariant).not.toHaveBeenCalled();
 
-      let variant = manifest.periods[0].variants[1];
-      expect(variant.id).toEqual(track.id);
-
       // after startup is complete, the manual selection takes effect.
       streamingEngine.onCanSwitch();
-      expect(streamingEngine.switchVariant)
-          .toHaveBeenCalledWith(variant, false);
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      const variant = streamingEngine.switchVariant.calls.argsFor(0)[0];
+      expect(variant.id).toEqual(newTrack.id);
     });
 
     it('still switches streams if called while switching Periods', function() {
@@ -1477,21 +1662,21 @@ describe('Player', function() {
       // startup doesn't call switchVariant
       expect(streamingEngine.switchVariant).not.toHaveBeenCalled();
 
-      let track = variantTracks[3];
-      let variant = manifest.periods[0].variants[3];
-      expect(variant.id).toEqual(track.id);
+      // pick a track
+      const newTrack = player.getVariantTracks().filter((t) => !t.active)[0];
 
       // simulate the transition to period 1
       transitionPeriod(1);
 
       // select the new track (from period 0, which is fine)
-      player.selectVariantTrack(track);
+      player.selectVariantTrack(newTrack);
       expect(streamingEngine.switchVariant).not.toHaveBeenCalled();
 
       // after transition is completed by onCanSwitch, switchVariant is called
       streamingEngine.onCanSwitch();
-      expect(streamingEngine.switchVariant)
-          .toHaveBeenCalledWith(variant, false);
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      const variant = streamingEngine.switchVariant.calls.argsFor(0)[0];
+      expect(variant.id).toEqual(newTrack.id);
     });
 
     it('switching audio doesn\'t change selected text track', function() {
@@ -1500,161 +1685,222 @@ describe('Player', function() {
         preferredTextLanguage: 'es'
       });
 
-      let textStream = manifest.periods[0].textStreams[1];
-      expect(textTracks[1].type).toBe(ContentType.TEXT);
-      expect(textTracks[1].language).toBe('en');
+      // We will manually switch from Spanish to English.
+      const englishTextTrack =
+          player.getTextTracks().filter((t) => t.language == 'en')[0];
 
-      let textTrack = textTracks[1];
       streamingEngine.switchTextStream.calls.reset();
-      player.selectTextTrack(textTrack);
-      expect(streamingEngine.switchTextStream).toHaveBeenCalledWith(textStream);
+      player.selectTextTrack(englishTextTrack);
+      expect(streamingEngine.switchTextStream).toHaveBeenCalled();
       // We have selected an English text track explicitly.
-      expect(getActiveTextTrack().id).toBe(textTrack.id);
+      expect(getActiveTextTrack().id).toBe(englishTextTrack.id);
 
-      let variantTrack = variantTracks[2];
-      let variant = manifest.periods[0].variants[2];
-      expect(variantTrack.id).toBe(variant.id);
-      player.selectVariantTrack(variantTrack);
+      const newVariantTrack =
+          player.getVariantTracks().filter((t) => !t.active)[0];
+      player.selectVariantTrack(newVariantTrack);
 
       // The active text track has not changed, even though the text language
       // preference is Spanish.
-      expect(getActiveTextTrack().id).toBe(textTrack.id);
+      expect(getActiveTextTrack().id).toBe(englishTextTrack.id);
     });
 
     it('selectAudioLanguage() takes precedence over ' +
        'preferredAudioLanguage', function() {
-          streamingEngine.onCanSwitch();
+      streamingEngine.onCanSwitch();
 
-          // This preference is set in beforeEach, before load().
-          expect(player.getConfiguration().preferredAudioLanguage).toBe('en');
+      // This preference is set in beforeEach, before load().
+      expect(player.getConfiguration().preferredAudioLanguage).toBe('en');
+      expect(getActiveVariantTrack().language).toBe('en');
 
-          expect(getActiveVariantTrack().language).toBe('en');
+      streamingEngine.switchVariant.calls.reset();
+      player.selectAudioLanguage('es');
 
-          let period = manifest.periods[0];
-          let spanishVariant = period.variants[4];
-          expect(spanishVariant.language).toBe('es');
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      const args = streamingEngine.switchVariant.calls.argsFor(0);
+      expect(args[0].language).toBe('es');
+      expect(args[1]).toBe(true);
+      expect(getActiveVariantTrack().language).toBe('es');
+    });
 
-          streamingEngine.switchVariant.calls.reset();
-          player.selectAudioLanguage('es');
+    it('selectAudioLanguage() respects selected role', function() {
+      streamingEngine.onCanSwitch();
+      expect(getActiveVariantTrack().roles).not.toContain('commentary');
 
-          expect(streamingEngine.switchVariant)
-              .toHaveBeenCalledWith(spanishVariant, true);
-          expect(getActiveVariantTrack().language).toBe('es');
-        });
+      streamingEngine.switchVariant.calls.reset();
+      player.selectAudioLanguage('en', 'commentary');
 
-    it('selectAudioLanguage() respects selected role',
-        function() {
-          streamingEngine.onCanSwitch();
-          expect(getActiveVariantTrack().id).toBe(1);
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      const args = streamingEngine.switchVariant.calls.argsFor(0);
+      expect(args[0].audio.roles).toContain('commentary');
+      expect(args[1]).toBe(true);
+      expect(getActiveVariantTrack().roles).toContain('commentary');
+    });
 
-          let period = manifest.periods[0];
-          let variantWithCommentaryRole = period.variants[2];
-          expect(variantWithCommentaryRole.audio.roles[0]).toBe('commentary');
+    it('selectAudioLanguage() does not change selected text track', function() {
+      // This came up in a custom application that allows to select
+      // from all tracks regardless of selected language.
+      // We imitate this behavior by calling selectTextLanguage()
+      // with one language and then selecting a track in a different
+      // language.
+      player.selectTextLanguage('en');
+      const spanishTextTrack = textTracks.filter((t) => t.language == 'es')[0];
+      player.selectTextTrack(spanishTextTrack);
+      player.selectAudioLanguage('es');
+      expect(getActiveTextTrack().id).toBe(spanishTextTrack.id);
+    });
 
-          streamingEngine.switchVariant.calls.reset();
-          player.selectAudioLanguage('en', 'commentary');
-
-          expect(streamingEngine.switchVariant)
-              .toHaveBeenCalledWith(variantWithCommentaryRole, true);
-          expect(getActiveVariantTrack().roles[0]).toBe('commentary');
-        });
-
-      it('selectAudioLanguage() does not change selected text track',
-        function() {
-          // This came up in a custom application that allows to select
-          // from all tracks regardless of selected language.
-          // We imitate this behavior by calling selectTextLanguage()
-          // with one language and then selecting a track in a different
-          // language.
-          player.selectTextLanguage('en');
-          expect(textTracks[0].language).toBe('es');
-          player.selectTextTrack(textTracks[0]);
-          player.selectAudioLanguage('es');
-          expect(getActiveTextTrack().id).toBe(textTracks[0].id);
-        });
-
-      it('selectTextLanguage() does not change selected variant track',
-        function() {
-          // This came up in a custom application that allows to select
-          // from all tracks regardless of selected language.
-          // We imitate this behavior by calling selectAudioLanguage()
-          // with one language and then selecting a track in a different
-          // language.
-          player.selectAudioLanguage('es');
-          expect(variantTracks[0].language).toBe('en');
-          player.selectVariantTrack(variantTracks[0]);
-          player.selectTextLanguage('es');
-          expect(getActiveVariantTrack().id).toBe(variantTracks[0].id);
-        });
+    it('selectTextLanguage() does not change selected variant track', () => {
+      // This came up in a custom application that allows to select
+      // from all tracks regardless of selected language.
+      // We imitate this behavior by calling selectAudioLanguage()
+      // with one language and then selecting a track in a different
+      // language.
+      player.selectAudioLanguage('es');
+      const englishVariantTrack =
+          variantTracks.filter((t) => t.language == 'en')[0];
+      player.selectVariantTrack(englishVariantTrack);
+      player.selectTextLanguage('es');
+      expect(getActiveVariantTrack().id).toBe(englishVariantTrack.id);
+    });
 
     it('selectTextLanguage() takes precedence over ' +
        'preferredTextLanguage', function() {
-          streamingEngine.onCanSwitch();
+      streamingEngine.onCanSwitch();
 
-          // This preference is set in beforeEach, before load().
-          expect(player.getConfiguration().preferredTextLanguage).toBe('es');
+      // This preference is set in beforeEach, before load().
+      expect(player.getConfiguration().preferredTextLanguage).toBe('es');
+      expect(getActiveTextTrack().language).toBe('es');
 
-          expect(getActiveTextTrack().language).toBe('es');
+      streamingEngine.switchTextStream.calls.reset();
+      player.selectTextLanguage('en');
 
-          let period = manifest.periods[0];
-          let englishStream = period.textStreams[1];
-          expect(englishStream.language).toBe('en');
+      expect(streamingEngine.switchTextStream).toHaveBeenCalled();
+      const args = streamingEngine.switchTextStream.calls.argsFor(0);
+      expect(args[0].language).toBe('en');
+      expect(getActiveTextTrack().language).toBe('en');
+    });
 
-          streamingEngine.switchTextStream.calls.reset();
-          player.selectTextLanguage('en');
+    it('selectTextLanguage() respects selected role', function() {
+      streamingEngine.onCanSwitch();
+      expect(getActiveTextTrack().roles).not.toContain('commentary');
 
-          expect(streamingEngine.switchTextStream)
-              .toHaveBeenCalledWith(englishStream);
-          expect(getActiveTextTrack().language).toBe('en');
-        });
+      streamingEngine.switchTextStream.calls.reset();
+      player.selectTextLanguage('en', 'commentary');
 
-    it('selectTextLanguage() respects selected role',
-        function() {
-          streamingEngine.onCanSwitch();
-          expect(getActiveTextTrack().id).toBe(6);
-
-          let period = manifest.periods[0];
-          let streamWithCommentaryRole = period.textStreams[2];
-          expect(streamWithCommentaryRole.roles[0]).toBe('commentary');
-
-          streamingEngine.switchTextStream.calls.reset();
-          player.selectTextLanguage('en', 'commentary');
-
-          expect(streamingEngine.switchTextStream)
-              .toHaveBeenCalledWith(streamWithCommentaryRole);
-          expect(getActiveTextTrack().roles[0]).toBe('commentary');
-        });
+      expect(streamingEngine.switchTextStream).toHaveBeenCalled();
+      const args = streamingEngine.switchTextStream.calls.argsFor(0);
+      expect(args[0].roles).toContain('commentary');
+      expect(getActiveTextTrack().roles).toContain('commentary');
+    });
 
     it('changing current audio language changes active stream', function() {
       streamingEngine.onCanSwitch();
-
-      let spanishVariant = manifest.periods[0].variants[4];
-      expect(spanishVariant.language).toBe('es');
 
       expect(getActiveVariantTrack().language).not.toBe('es');
       expect(streamingEngine.switchVariant).not.toHaveBeenCalled();
       player.selectAudioLanguage('es');
 
-      expect(streamingEngine.switchVariant)
-          .toHaveBeenCalledWith(spanishVariant, true);
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      const args = streamingEngine.switchVariant.calls.argsFor(0);
+      expect(args[0].language).toBe('es');
+      expect(args[1]).toBe(true);
       expect(getActiveVariantTrack().language).toBe('es');
     });
 
-    it('changing currentTextLanguage changes active stream', function() {
+    it('changing current text language changes active stream', function() {
       streamingEngine.onCanSwitch();
-
-      let englishStream = manifest.periods[0].textStreams[1];
-      expect(englishStream.language).toBe('en');
 
       expect(getActiveTextTrack().language).not.toBe('en');
       expect(streamingEngine.switchTextStream).not.toHaveBeenCalled();
       player.selectTextLanguage('en');
 
-      expect(streamingEngine.switchTextStream)
-          .toHaveBeenCalledWith(englishStream);
+      expect(streamingEngine.switchTextStream).toHaveBeenCalled();
+      const args = streamingEngine.switchTextStream.calls.argsFor(0);
+      expect(args[0].language).toBe('en');
       expect(getActiveTextTrack().language).toBe('en');
     });
-  });
+
+    it('remembers the channel count when ABR is reenabled', () => {
+      streamingEngine.onCanSwitch();
+
+      // We prefer 6 channels, and we are currently playing 6 channels.
+      expect(player.getConfiguration().preferredAudioChannelCount).toBe(6);
+      expect(getActiveVariantTrack().channelsCount).toBe(6);
+
+      // Manually turn off ABR and select a 2-channel track.
+      player.configure({abr: {enabled: false}});
+      const newTrack =
+          player.getVariantTracks().filter((t) => t.channelsCount == 2)[0];
+      player.selectVariantTrack(newTrack);
+
+      // See that we are playing a 2-channel track now.
+      expect(getActiveVariantTrack().channelsCount).toBe(2);
+
+      // See that AbrManager has a list of 2-channel tracks now.
+      expect(abrManager.variants.length).toBeGreaterThan(0);
+      abrManager.variants.forEach((v) => {
+        expect(v.audio.channelsCount).toBe(2);
+      });
+
+      // Re-enable ABR.
+      player.configure({abr: {enabled: true}});
+
+      // See that AbrManager still has a list of 2-channel tracks.
+      expect(abrManager.variants.length).toBeGreaterThan(0);
+      abrManager.variants.forEach((v) => {
+        expect(v.audio.channelsCount).toBe(2);
+      });
+      // See that we are still playing a 2-channel track.
+      expect(getActiveVariantTrack().channelsCount).toBe(2);
+    });
+
+    it('remembers the channel count across key status changes', () => {
+      // Simulate an encrypted stream.  Mark half of the audio streams with key
+      // ID 'aaa', and the other half with 'bbb'.  Remove all roles, so that our
+      // choices are limited only by channel count and key status.
+      manifest.periods[0].variants.forEach((variant) => {
+        const keyId = (variant.audio.id % 2) ? 'aaa' : 'bbb';
+        variant.audio.keyId = keyId;
+        variant.video.roles = [];
+        variant.audio.roles = [];
+      });
+
+      streamingEngine.onCanSwitch();
+
+      // We prefer 6 channels, and we are currently playing 6 channels.
+      expect(player.getConfiguration().preferredAudioChannelCount).toBe(6);
+      expect(getActiveVariantTrack().channelsCount).toBe(6);
+
+      // Manually select a 2-channel track.
+      const newTrack =
+          player.getVariantTracks().filter((t) => t.channelsCount == 2)[0];
+      player.selectVariantTrack(newTrack);
+
+      // See that we are playing a 2-channel track now.
+      expect(getActiveVariantTrack().channelsCount).toBe(2);
+
+      // See that AbrManager has a list of 2-channel tracks now.
+      expect(abrManager.variants.length).toBeGreaterThan(0);
+      abrManager.variants.forEach((v) => {
+        expect(v.audio.channelsCount).toBe(2);
+      });
+
+      // Simulate a key status event that would trigger the removal of some
+      // tracks.
+      onKeyStatus({
+        'aaa': 'usable',
+        'bbb': 'output-restricted',
+      });
+
+      // See that AbrManager still has a list of 2-channel tracks.
+      expect(abrManager.variants.length).toBeGreaterThan(0);
+      abrManager.variants.forEach((v) => {
+        expect(v.audio.channelsCount).toBe(2);
+      });
+      // See that we are still playing a 2-channel track.
+      expect(getActiveVariantTrack().channelsCount).toBe(2);
+    });
+  });  // describe('tracks')
 
   describe('languages', function() {
     it('chooses the first as default', function(done) {
@@ -1963,7 +2209,7 @@ describe('Player', function() {
 
       /**
        * Checks that the switch history is correct.
-       * @param {!Array.<shakaExtern.TrackChoice>} additional
+       * @param {!Array.<shaka.extern.TrackChoice>} additional
        */
       function checkHistory(additional) {
         let prefix = {
@@ -1981,7 +2227,7 @@ describe('Player', function() {
       }
 
       /**
-       * @param {shakaExtern.Variant} variant
+       * @param {shaka.extern.Variant} variant
        * @suppress {accessControls}
        */
       function switch_(variant) {
@@ -2686,13 +2932,54 @@ describe('Player', function() {
       }).catch(fail).then(done);
     });
 
-    /**
-     * @param {!Object.<string, string>} keyStatusMap
-     * @suppress {accessControls}
-     */
-    function onKeyStatus(keyStatusMap) {
-      player.onKeyStatus_(keyStatusMap);
-    }
+    it('updates AbrManager about restricted variants', function(done) {
+      manifest = new shaka.test.ManifestGenerator()
+              .addPeriod(0)
+                .addVariant(0)
+                  .addVideo(1).keyId('abc')
+                .addVariant(2)
+                  .addVideo(3)
+              .build();
+
+      let abrManager = new shaka.test.FakeAbrManager();
+      player.configure({abrFactory: function() { return abrManager; }});
+      setupPlayer().then(function() {
+        expect(player.getVariantTracks().length).toBe(2);
+
+        // We have some key statuses, but not for the key IDs we know.
+        abrManager.setVariants.calls.reset();
+        onKeyStatus({'foo': 'usable'});
+
+        expect(abrManager.setVariants).toHaveBeenCalled();
+        let variants = abrManager.setVariants.calls.argsFor(0)[0];
+        expect(variants.length).toBe(1);
+        expect(variants[0].id).toBe(2);
+      }).catch(fail).then(done);
+    });
+
+    it('chooses codecs after considering 6-channel preference', async () => {
+      manifest = new shaka.test.ManifestGenerator()
+          .addPeriod(0)
+            // Surround sound AC-3, preferred by config
+            .addVariant(0).bandwidth(300)
+              .addAudio(0).channelsCount(6).mime('audio/mp4', 'ac-3')
+            // Stereo AAC, would win out based on bandwidth alone
+            .addVariant(1).bandwidth(100)
+              .addAudio(1).channelsCount(2).mime('audio/mp4', 'mp4a.40.2')
+          .build();
+
+      // Configure for 6 channels.
+      player.configure({
+        preferredAudioChannelCount: 6,
+      });
+      await setupPlayer();
+      expect(abrManager.setVariants).toHaveBeenCalled();
+      // We've chosen codecs, so only 1 track should remain.
+      expect(abrManager.variants.length).toBe(1);
+      // It should be the 6-channel variant, based on our preference.
+      expect(abrManager.variants[0].audio.channelsCount).toEqual(6);
+      expect(abrManager.variants[0].audio.codecs).toEqual('ac-3');
+    });
 
     /**
      * @return {!Promise}
@@ -2855,6 +3142,53 @@ describe('Player', function() {
       // Before the fix, load() would fail assertions and throw errors.
       player.load('', 0, parserFactory).catch(fail).then(done);
     });
+
+    it('respects startTime of 0', async () => {
+      // What we shouldn't do is treat start time of 0 as the same as startTime
+      // of null/undefined.  0 means timestamp 0, whereas null/undefined means
+      // "default".  For VOD, the default is 0, but for live streams, the
+      // default is the live edge.
+
+      // Create a live timeline and manifest.
+      let timeline = new shaka.media.PresentationTimeline(300, 0);
+      timeline.setStatic(false);
+
+      manifest = new shaka.test.ManifestGenerator()
+          .setTimeline(timeline)
+          .addPeriod(0)
+            .addVariant(0)
+            .addVideo(1)
+          .build();
+
+      let parser = new shaka.test.FakeManifestParser(manifest);
+      let parserFactory = function() { return parser; };
+
+      // To ensure that Playhead is correctly created, we must use the original
+      // playhead injector.  To inspect the real Playhead instance, though, we
+      // must shim this method and keep a copy of the real Playhead.  Otherwise,
+      // we would be merely inspecting the mock Playhead.
+      /** @type {shaka.media.Playhead} */
+      let realPlayhead = null;
+
+      /**
+       * @this {shaka.Player}
+       * @return {!shaka.media.Playhead}
+       */
+      player.createPlayhead = function() {
+        realPlayhead =
+            shaka.Player.prototype.createPlayhead.apply(this, arguments);
+        return realPlayhead;
+      };
+
+      await player.load('', /* startTime */ 0, parserFactory);
+
+      // Ensure this is seen as a live stream, or else the test is invalid.
+      expect(player.isLive()).toBe(true);
+
+      // If startTime of 0 was treated as null, then getTime() would point to
+      // the live edge instead of 0.
+      expect(realPlayhead.getTime()).toBe(0);
+    });
   });
 
   describe('language methods', function() {
@@ -2954,7 +3288,7 @@ describe('Player', function() {
 
   /**
    * Gets the currently active variant track.
-   * @return {shakaExtern.Track}
+   * @return {shaka.extern.Track}
    */
   function getActiveVariantTrack() {
     let activeTracks = player.getVariantTracks().filter(function(track) {
@@ -2967,7 +3301,7 @@ describe('Player', function() {
 
   /**
    * Gets the currently active text track.
-   * @return {shakaExtern.Track}
+   * @return {shaka.extern.Track}
    */
   function getActiveTextTrack() {
     let activeTracks = player.getTextTracks().filter(function(track) {
@@ -3011,5 +3345,13 @@ describe('Player', function() {
         return actual.indexOf(substring) >= 0;
       }
     };
+  }
+
+  /**
+   * @param {!Object.<string, string>} keyStatusMap
+   * @suppress {accessControls}
+   */
+  function onKeyStatus(keyStatusMap) {
+    player.onKeyStatus_(keyStatusMap);
   }
 });

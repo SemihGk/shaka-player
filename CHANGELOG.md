@@ -1,3 +1,87 @@
+## 2.3.7 (2018-04-24)
+
+Bugfixes:
+  - Fixed manifest update frequency calculations
+    - https://github.com/google/shaka-player/issues/1399
+  - Fixed repeated seeking during HLS live streaming on Chromecast
+    - https://github.com/google/shaka-player/issues/1411
+
+Demo app:
+  - Fixed updating of the app URL on Android when pasting into the custom asset
+    field
+    - https://github.com/google/shaka-player/issues/1079
+  - Added Axinom live test assets
+    - https://github.com/google/shaka-player/pull/1409
+
+
+## 2.3.6 (2018-04-11)
+
+Bugfixes:
+  - Handle HLS segments tags that occur before playlist tags
+    - https://github.com/google/shaka-player/issues/1382
+  - Avoid telling AbrManager about key-system-restricted streams, to simplify
+    building AbrManager plugins.
+  - Fixed exported enum definition for network plugin priorities
+  - Fixed ES5 strict mode compatibility in our module wrapper
+    - https://github.com/google/shaka-player/pull/1398
+
+Demo app:
+  - Fixed playback of VDMS assets by updating the license request details
+    - https://github.com/google/shaka-player/pull/1388
+
+
+## 2.3.5 (2018-03-29)
+
+New features:
+  - Do not buffer audio far ahead of video
+    - https://github.com/google/shaka-player/issues/964
+
+Bugfixes:
+  - Fixed early seeking (immediately upon load)
+    - https://github.com/google/shaka-player/issues/1298
+  - Fixed repeated seeking in HLS live (also affects DASH with
+    timeShiftBufferDepth of zero)
+    - https://github.com/google/shaka-player/issues/1331
+  - Fixed VTT+MP4 parsing with respect to TRUN box
+    - https://github.com/google/shaka-player/issues/1266
+  - Fixed hang in StreamingEngine when playing at the left edge of the seek
+    range on slow embedded devices
+  - Work around slow DASH parsing on embedded devices
+
+Demo app:
+  - Fixed CSS for display on Chromecast and other TV devices
+  - Added "startTime" URL parameter for debugging purposes
+
+
+## 2.3.4 (2018-03-22)
+
+New features:
+  - Support for non-standard DASH SegmentTemplate strings using formats other
+    than "d" (such as "x" and "o").
+    - https://github.com/Dash-Industry-Forum/DASH-IF-IOP/issues/177
+
+Bugfixes:
+  - Fixed rapid seeking in zero-width seek ranges, such as in HLS live
+    - https://github.com/google/shaka-player/issues/1331
+  - Fixed use of native controls for text display
+    - https://github.com/google/shaka-player/issues/1332
+  - Fixed parsing of multiple 'emsg' boxes
+    - https://github.com/google/shaka-player/issues/1340
+
+Demo app:
+  - Added an "unload" button to the demo app
+  - Fixed enabling of TS assets in the demo app
+    - https://github.com/google/shaka-player/issues/1214
+
+Docs:
+  - Added a doc describing DASH manifests
+    - https://github.com/google/shaka-player/issues/1233
+  - Fixed documentation of CONTENT_UNSUPPORTED_BY_BROWSER error
+    - https://github.com/google/shaka-player/issues/1349
+  - Updated architecture diagrams
+    - https://github.com/google/shaka-player/issues/1197
+
+
 ## 2.3.3 (2018-03-01)
 
 New features:

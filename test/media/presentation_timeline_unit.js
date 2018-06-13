@@ -88,15 +88,15 @@ describe('PresentationTimeline', function() {
    * Creates a IPR PresentationTimeline.
    *
    * @param {number} duration
-   * @param {number=} opt_delay
+   * @param {number=} delay
    * @return {shaka.media.PresentationTimeline}
    */
-  function makeIprTimeline(duration, opt_delay) {
+  function makeIprTimeline(duration, delay) {
     let now = Date.now() / 1000;
     let timeline = makePresentationTimeline(
         /* static */ false, duration, /* start time */ now,
         /* availability */ Infinity, /* max seg dur */ 10,
-        /* clock offset */ 0, opt_delay || 0);
+        /* clock offset */ 0, delay || 0);
     expect(timeline.isLive()).toBe(false);
     expect(timeline.isInProgress()).toBe(true);
     return timeline;
@@ -106,15 +106,15 @@ describe('PresentationTimeline', function() {
    * Creates a live PresentationTimeline.
    *
    * @param {number} availability
-   * @param {number=} opt_delay
+   * @param {number=} delay
    * @return {shaka.media.PresentationTimeline}
    */
-  function makeLiveTimeline(availability, opt_delay) {
+  function makeLiveTimeline(availability, delay) {
     let now = Date.now() / 1000;
     let timeline = makePresentationTimeline(
         /* static */ false, /* duration */ Infinity, /* start time */ now,
         availability, /* max seg dur */ 10,
-        /* clock offset */ 0, opt_delay || 0);
+        /* clock offset */ 0, delay || 0);
     expect(timeline.isLive()).toBe(true);
     expect(timeline.isInProgress()).toBe(false);
     return timeline;
@@ -316,6 +316,46 @@ describe('PresentationTimeline', function() {
       // The earliest segment time is later than now - availability duration,
       // so segment time 90 takes precedence.
       expect(timeline.getSeekRangeStart()).toBe(90);
+    });
+  });
+
+  describe('getSafeSeekRangeStart', function() {
+    it('ignores offset for VOD', function() {
+      let timeline = makeVodTimeline(/* duration */ 60);
+      expect(timeline.getSafeSeekRangeStart(0)).toBe(0);
+      expect(timeline.getSafeSeekRangeStart(10)).toBe(0);
+      expect(timeline.getSafeSeekRangeStart(25)).toBe(0);
+    });
+
+    it('offsets from live edge', function() {
+      let timeline = makeLiveTimeline(/* availability */ 60, /* delay */ 0);
+
+      setElapsed(120);
+      // now (120) - availability (60) - segment size (10) = 50
+      expect(timeline.getSeekRangeStart()).toBe(50);
+
+      expect(timeline.getSafeSeekRangeStart(10)).toBe(60);
+      expect(timeline.getSafeSeekRangeStart(25)).toBe(75);
+    });
+
+    it('clamps to end', function() {
+      let timeline = makeLiveTimeline(/* availability */ 60, /* delay */ 0);
+
+      setElapsed(120);
+      expect(timeline.getSegmentAvailabilityEnd()).toBe(110);
+      expect(timeline.getSafeSeekRangeStart(70)).toBe(110);
+      expect(timeline.getSafeSeekRangeStart(85)).toBe(110);
+      expect(timeline.getSafeSeekRangeStart(200)).toBe(110);
+    });
+
+    it('will return 0 if safe', function() {
+      let timeline = makeLiveTimeline(/* availability */ 60, /* delay */ 0);
+
+      setElapsed(50);
+      // now (50) - availability (60) - segment size (10) = -20
+      expect(timeline.getSeekRangeStart()).toBe(0);
+      expect(timeline.getSafeSeekRangeStart(0)).toBe(0);
+      expect(timeline.getSafeSeekRangeStart(25)).toBe(5);
     });
   });
 

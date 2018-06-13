@@ -25,7 +25,7 @@ let ShakaDemoUtils = {};
  * @param {shaka.Player} player
  */
 ShakaDemoUtils.setupAssetMetadata = function(asset, player) {
-  let config = /** @type {shakaExtern.PlayerConfiguration} */(
+  let config = /** @type {shaka.extern.PlayerConfiguration} */(
       {drm: {}, manifest: {dash: {}}});
 
   // Add config from this asset.
@@ -59,7 +59,7 @@ ShakaDemoUtils.setupAssetMetadata = function(asset, player) {
   }
   if (asset.extraConfig) {
     player.configure(
-        /** @type {shakaExtern.PlayerConfiguration} */ (asset.extraConfig));
+        /** @type {shaka.extern.PlayerConfiguration} */ (asset.extraConfig));
   }
 };
 
@@ -67,7 +67,7 @@ ShakaDemoUtils.setupAssetMetadata = function(asset, player) {
 /**
  * @param {!Object.<string, string>} headers
  * @param {shaka.net.NetworkingEngine.RequestType} requestType
- * @param {shakaExtern.Request} request
+ * @param {shaka.extern.Request} request
  * @private
  */
 ShakaDemoUtils.addLicenseRequestHeaders_ =
@@ -83,8 +83,8 @@ ShakaDemoUtils.addLicenseRequestHeaders_ =
 
 
 /**
- * Return true if the current content is Transport Stream.
- * Used to decide if caption button is shown all the time in the demo,
+ * Return true if the current content is in the Transport Stream format.
+ * Used to decide if the caption button is shown all the time in the demo,
  * and whether to show 'Default Text' as a Text Track option.
  *
  * @param {shaka.Player} player

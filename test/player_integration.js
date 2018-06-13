@@ -22,7 +22,7 @@ describe('Player', function() {
   /** @type {!jasmine.Spy} */
   let onErrorSpy;
 
-  /** @type {shakaExtern.SupportType} */
+  /** @type {shaka.extern.SupportType} */
   let support;
   /** @type {!HTMLVideoElement} */
   let video;
@@ -307,7 +307,7 @@ describe('Player', function() {
       let testName =
           asset.source + ' / ' + asset.name + ' : ' + asset.manifestUri;
 
-      let wit = asset.focus ? fit : external_it;
+      let wit = asset.focus ? fit : externalIt;
       wit(testName, function(done) {
         if (asset.drm.length && !asset.drm.some(
             function(keySystem) { return support.drm[keySystem]; })) {
@@ -331,7 +331,7 @@ describe('Player', function() {
         let config = {abr: {}, drm: {}, manifest: {dash: {}}};
         config.abr.enabled = false;
         config.manifest.dash.clockSyncUri =
-            '//shaka-player-demo.appspot.com/time.txt';
+            'https://shaka-player-demo.appspot.com/time.txt';
         if (asset.licenseServers) {
           config.drm.servers = asset.licenseServers;
         }
@@ -621,7 +621,7 @@ describe('Player', function() {
   /**
    * @param {!Object.<string, string>} headers
    * @param {shaka.net.NetworkingEngine.RequestType} requestType
-   * @param {shakaExtern.Request} request
+   * @param {shaka.extern.Request} request
    */
   function addLicenseRequestHeaders(headers, requestType, request) {
     const RequestType = compiledShaka.net.NetworkingEngine.RequestType;

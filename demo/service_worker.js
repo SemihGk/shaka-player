@@ -60,8 +60,8 @@ const NETWORK_TIMEOUT = 2;
  * @const {!Array.<string>}
  */
 const CRITICAL_RESOURCES = [
-  '.',  // this resolves to the page
-  'index.html',  // another way to access the page
+  '.',  // This resolves to the page.
+  'index.html',  // Another way to access the page.
   'app_manifest.json',
 
   'demo.css',
@@ -84,8 +84,8 @@ const CRITICAL_RESOURCES = [
  */
 const OPTIONAL_RESOURCES = [
   'favicon.ico',
-  '//shaka-player-demo.appspot.com/assets/poster.jpg',
-  '//shaka-player-demo.appspot.com/assets/audioOnly.gif',
+  'https://shaka-player-demo.appspot.com/assets/poster.jpg',
+  'https://shaka-player-demo.appspot.com/assets/audioOnly.gif',
   '../node_modules/mux.js/dist/mux.js'
 ];
 
@@ -98,7 +98,7 @@ const OPTIONAL_RESOURCES = [
  * @const {!Array.<string>}
  */
 const NO_CORS_RESOURCES = [
-  '//www.gstatic.com/cv/js/sender/v1/cast_sender.js'
+  'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js'
 ];
 
 

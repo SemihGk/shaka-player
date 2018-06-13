@@ -25,12 +25,12 @@ describe('DrmEngine', function() {
   const audioInitSegmentUri = '/base/test/test/assets/multidrm-audio-init.mp4';
   const audioSegmentUri = '/base/test/test/assets/multidrm-audio-segment.mp4';
 
-  /** @type {!Object.<string, ?shakaExtern.DrmSupportType>} */
+  /** @type {!Object.<string, ?shaka.extern.DrmSupportType>} */
   let support = {};
 
   /** @type {!HTMLVideoElement} */
   let video;
-  /** @type {shakaExtern.Manifest} */
+  /** @type {shaka.extern.Manifest} */
   let manifest;
 
   /** @type {!jasmine.Spy} */
@@ -148,7 +148,7 @@ describe('DrmEngine', function() {
     let expectedObject = {};
     expectedObject[ContentType.AUDIO] = audioStream;
     expectedObject[ContentType.VIDEO] = videoStream;
-    mediaSourceEngine.init(expectedObject).then(done);
+    mediaSourceEngine.init(expectedObject, false).then(done);
   });
 
   afterEach(function(done) {
@@ -165,7 +165,7 @@ describe('DrmEngine', function() {
   });
 
   describe('basic flow', function() {
-    drm_it('gets a license and can play encrypted segments',
+    drmIt('gets a license and can play encrypted segments',
         checkAndRun((done) => {
           // The error callback should not be invoked.
           onErrorSpy.and.callFake(fail);

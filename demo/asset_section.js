@@ -57,7 +57,7 @@ shakaDemo.setupAssets_ = function() {
 
     let option = document.createElement('option');
     option.textContent = asset.name;
-    option.asset = asset;  // custom attribute to map back to the asset
+    option.asset = asset;  // A custom attribute to map back to the asset.
     group.appendChild(option);
 
     if (asset.drm.length && !asset.drm.some(
@@ -110,12 +110,14 @@ shakaDemo.setupAssets_ = function() {
 
   document.getElementById('loadButton').addEventListener(
       'click', shakaDemo.load);
+  document.getElementById('unloadButton').addEventListener(
+      'click', shakaDemo.unload);
   document.getElementById('licenseServerInput').addEventListener(
-      'keyup', shakaDemo.onAssetKeyUp_);
+      'input', shakaDemo.onAssetInput_);
   document.getElementById('manifestInput').addEventListener(
-      'keyup', shakaDemo.onAssetKeyUp_);
+      'input', shakaDemo.onAssetInput_);
   document.getElementById('certificateInput').addEventListener(
-      'keyup', shakaDemo.onAssetKeyUp_);
+      'input', shakaDemo.onAssetInput_);
 
   return asyncOfflineSetup;
 };
@@ -125,24 +127,21 @@ shakaDemo.setupAssets_ = function() {
  * @param {!Event} event
  * @private
  */
-shakaDemo.onAssetKeyUp_ = function(event) {
+shakaDemo.onAssetInput_ = function(event) {
   // Mirror the users input as they type.
   shakaDemo.hashShouldChange_();
-  // Load the asset if the user presses enter.
-  if (event.keyCode != 13) return;
-  shakaDemo.load();
 };
 
 
 /**
- * @param {!string} uri
+ * @param {string} uri
  * @return {!Promise.<ArrayBuffer>}
  * @private
  */
 shakaDemo.requestCertificate_ = function(uri) {
   let netEngine = shakaDemo.player_.getNetworkingEngine();
   const requestType = shaka.net.NetworkingEngine.RequestType.APP;
-  let request = /** @type {shakaExtern.Request} */ ({uris: [uri]});
+  let request = /** @type {shaka.extern.Request} */ ({uris: [uri]});
 
   return netEngine.request(requestType, request).promise
       .then((response) => response.data);
@@ -192,16 +191,16 @@ shakaDemo.preparePlayer_ = function(asset) {
 
   let commonDrmSystems =
       ['com.widevine.alpha', 'com.microsoft.playready', 'com.adobe.primetime'];
-  let config = /** @type {shakaExtern.PlayerConfiguration} */(
+  let config = /** @type {shaka.extern.PlayerConfiguration} */(
       {abr: {}, streaming: {}, manifest: {dash: {}}});
-  config.drm = /** @type {shakaExtern.DrmConfiguration} */({
+  config.drm = /** @type {shaka.extern.DrmConfiguration} */({
     advanced: {}});
   commonDrmSystems.forEach(function(system) {
     config.drm.advanced[system] =
-        /** @type {shakaExtern.AdvancedDrmConfiguration} */({});
+        /** @type {shaka.extern.AdvancedDrmConfiguration} */({});
   });
   config.manifest.dash.clockSyncUri =
-      '//shaka-player-demo.appspot.com/time.txt';
+      'https://shaka-player-demo.appspot.com/time.txt';
 
   if (!asset) {
     // Use the custom fields.
@@ -219,7 +218,7 @@ shakaDemo.preparePlayer_ = function(asset) {
       // This simplifies configuration for the user.
       // They will simply fill in a Widevine license server on Chrome, etc.
       licenseServers: licenseServers,
-      // Use custom certificate for all key systems as well
+      // Use a custom certificate for all key systems as well
       certificateUri: document.getElementById('certificateInput').value
     });
   }
@@ -247,6 +246,12 @@ shakaDemo.preparePlayer_ = function(asset) {
       document.getElementById('preferredAudioLanguage').value;
   config.preferredTextLanguage =
       document.getElementById('preferredTextLanguage').value;
+  const preferredAudioChannelCount =
+      Number(document.getElementById('preferredAudioChannelCount').value);
+  if (!isNaN(preferredAudioChannelCount)) {
+    config.preferredAudioChannelCount = preferredAudioChannelCount;
+  }
+
   config.abr.enabled =
       document.getElementById('enableAdaptation').checked;
   let smallGapLimit = document.getElementById('smallGapLimit').value;
@@ -256,9 +261,14 @@ shakaDemo.preparePlayer_ = function(asset) {
   config.streaming.jumpLargeGaps =
       document.getElementById('jumpLargeGaps').checked;
 
+  // When we use native controls, we must always stream text.
+  // See comments in onNativeChange_ for details.
+  config.streaming.alwaysStreamText =
+      document.getElementById('showNative').checked;
+
   player.configure(config);
 
-  // TODO: document demo app debugging features
+  // TODO: Document demo app debugging features.
   if (window.debugConfig) {
     player.configure(window.debugConfig);
   }
@@ -269,7 +279,7 @@ shakaDemo.preparePlayer_ = function(asset) {
 
 /** Compute which assets should be disabled. */
 shakaDemo.computeDisabledAssets = function() {
-  // TODO: use remote support probe, recompute asset disabled when casting?
+  // TODO: Use a remote support probe, recompute asset disabled when casting?
   shakaDemo.onlineOptGroups_.forEach(function(group) {
     group.disabled = !navigator.onLine;
   });
@@ -296,9 +306,9 @@ shakaDemo.load = function() {
 
   configureCertificate.then(function() {
     // Load the manifest.
-    return player.load(asset.manifestUri);
+    return player.load(asset.manifestUri, shakaDemo.startTime_);
   }).then(function() {
-    // Update control state in case autoplay is disabled.
+    // Update the control state in case autoplay is disabled.
     shakaDemo.controls_.loadComplete();
 
     shakaDemo.hashShouldChange_();
@@ -308,7 +318,7 @@ shakaDemo.load = function() {
       shakaDemo.localVideo_.poster = shakaDemo.audioOnlyPoster_;
     }
 
-    // Disallow casting of offline content.
+    // Disallow the casting of offline content.
     let isOffline = asset.manifestUri.indexOf('offline:') == 0;
     shakaDemo.controls_.allowCast(!isOffline);
 
@@ -338,4 +348,10 @@ shakaDemo.load = function() {
   // event.  This seems to work only because Shaka Player has already created a
   // MediaSource object and set video.src.
   shakaDemo.video_.play();
+};
+
+
+/** Unload any current asset. */
+shakaDemo.unload = function() {
+  shakaDemo.player_.unload();
 };

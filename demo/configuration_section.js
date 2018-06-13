@@ -37,6 +37,8 @@ shakaDemo.setupConfiguration_ = function() {
       'input', shakaDemo.onConfigInput_);
   document.getElementById('preferredTextLanguage').addEventListener(
       'input', shakaDemo.onConfigInput_);
+  document.getElementById('preferredAudioChannelCount').addEventListener(
+      'input', shakaDemo.onConfigInput_);
   document.getElementById('showNative').addEventListener(
       'change', shakaDemo.onNativeChange_);
   document.getElementById('showTrickPlay').addEventListener(
@@ -90,7 +92,7 @@ shakaDemo.onDrmSettingsChange_ = function(event) {
  */
 shakaDemo.onLogLevelChange_ = function(event) {
   // shaka.log is not set if logging isn't enabled.
-  // I.E. if using the compiled version of shaka.
+  // I.E. if using the release version of shaka.
   if (shaka.log) {
     let logLevel = event.target[event.target.selectedIndex];
     switch (logLevel.value) {
@@ -148,11 +150,14 @@ shakaDemo.onGapInput_ = function(event) {
  * @private
  */
 shakaDemo.onConfigInput_ = function(event) {
-  shakaDemo.player_.configure(/** @type {shakaExtern.PlayerConfiguration} */({
+  let preferredAudioChannelCount =
+      Number(document.getElementById('preferredAudioChannelCount').value) || 2;
+  shakaDemo.player_.configure(/** @type {shaka.extern.PlayerConfiguration} */({
     preferredAudioLanguage:
         document.getElementById('preferredAudioLanguage').value,
     preferredTextLanguage:
-        document.getElementById('preferredTextLanguage').value
+        document.getElementById('preferredTextLanguage').value,
+    preferredAudioChannelCount: preferredAudioChannelCount,
   }));
   // Change the hash, to mirror this.
   shakaDemo.hashShouldChange_();
@@ -165,9 +170,9 @@ shakaDemo.onConfigInput_ = function(event) {
  */
 shakaDemo.onAdaptationChange_ = function(event) {
   // Update adaptation config.
-  shakaDemo.player_.configure(/** @type {shakaExtern.PlayerConfiguration} */({
+  shakaDemo.player_.configure({
     abr: {enabled: event.target.checked}
-  }));
+  });
   // Change the hash, to mirror this.
   shakaDemo.hashShouldChange_();
 };
@@ -189,6 +194,14 @@ shakaDemo.onNativeChange_ = function(event) {
     showTrickPlay.disabled = false;
     shakaDemo.controls_.setEnabled(true);
   }
+
+  // Update text streaming config.  When we use native controls, we must always
+  // stream text.  This is because the native controls can't send an event when
+  // the text display state changes, so we can't use the display state to choose
+  // when to stream text.
+  shakaDemo.player_.configure({
+    streaming: {alwaysStreamText: event.target.checked}
+  });
 
   // Change the hash, to mirror this.
   shakaDemo.hashShouldChange_();

@@ -23,14 +23,14 @@ goog.provide('shaka.test.TestScheme');
  * and manifests that will point to a fake manifest generator.
  *
  * @param {string} uri
- * @param {shakaExtern.Request} request
+ * @param {shaka.extern.Request} request
  * @param {shaka.net.NetworkingEngine.RequestType=} requestType
- * @return {!shakaExtern.IAbortableOperation.<shakaExtern.Response>}
+ * @return {!shaka.extern.IAbortableOperation.<shaka.extern.Response>}
  */
 shaka.test.TestScheme = function(uri, request, requestType) {
   let manifestParts = /^test:([^/]+)$/.exec(uri);
   if (manifestParts) {
-    /** @type {shakaExtern.Response} */
+    /** @type {shaka.extern.Response} */
     let response = {
       uri: uri,
       data: new ArrayBuffer(0),
@@ -75,13 +75,13 @@ shaka.test.TestScheme = function(uri, request, requestType) {
     responseData = generator.getSegment(index + 1, 0, 0);
   }
 
-  /** @type {shakaExtern.Response} */
+  /** @type {shaka.extern.Response} */
   let ret = {uri: uri, data: responseData, headers: {}};
   return shaka.util.AbortableOperation.completed(ret);
 };
 
 
-/** @const {!Object.<string, shakaExtern.Manifest>} */
+/** @const {!Object.<string, shaka.extern.Manifest>} */
 shaka.test.TestScheme.MANIFESTS = {};
 
 
@@ -176,7 +176,7 @@ shaka.test.TestScheme.DATA = {
       mimeType: 'text/vtt'
     },
     licenseServers: {
-      'com.widevine.alpha': '//cwip-shaka-proxy.appspot.com/no_auth'
+      'com.widevine.alpha': 'https://cwip-shaka-proxy.appspot.com/no_auth'
     },
     duration: 30
   },
@@ -263,6 +263,14 @@ shaka.test.TestScheme.DATA = {
           'Pv9qHnu3ZWJNZ12jgkqTabmwXbDWk_47tLNE'
     },
     duration: 30
+  },
+  'cea-708_ts': {
+    video: {
+      segmentUri: '/base/test/test/assets/captions-test.ts',
+      mimeType: 'video/mp2t',
+      codecs: 'avc1.64001e'
+    },
+    duration: 30
   }
 };
 
@@ -278,7 +286,8 @@ shaka.test.TestScheme.setupPlayer = function(player, name) {
   goog.asserts.assert(asset, 'Unknown asset');
   if (!asset) return;
   if (asset.licenseRequestHeaders) {
-    player.getNetworkingEngine().registerRequestFilter(
+    let netEngine = player.getNetworkingEngine();
+    netEngine.registerRequestFilter(
         function(type, request) {
           if (type != shaka.net.NetworkingEngine.RequestType.LICENSE) return;
 
@@ -306,10 +315,14 @@ shaka.test.TestScheme.createManifests = function(shaka, suffix) {
 
   /**
    * @param {Object} metadata
-   * @return {shaka.test.DashVodStreamGenerator}
+   * @return {shaka.test.IStreamGenerator}
    */
   function createStreamGenerator(metadata) {
-    return new windowShaka.test.DashVodStreamGenerator(
+    if (metadata.segmentUri.indexOf('.ts') != -1) {
+      return new windowShaka.test.TSVodStreamGenerator(
+          metadata.segmentUri);
+    }
+    return new windowShaka.test.Mp4VodStreamGenerator(
         metadata.initSegmentUri, metadata.mvhdOffset, metadata.segmentUri,
         metadata.tfdtOffset, metadata.segmentDuration,
         metadata.presentationTimeOffset);
@@ -342,8 +355,7 @@ shaka.test.TestScheme.createManifests = function(shaka, suffix) {
   }
 
   let async = [];
-  // Include 'window' to use uncompiled version version of the
-  // library.
+  // Include 'window' to use uncompiled version version of the library.
   const DATA = windowShaka.test.TestScheme.DATA;
   const GENERATORS = windowShaka.test.TestScheme.GENERATORS;
   const MANIFESTS = windowShaka.test.TestScheme.MANIFESTS;
@@ -353,9 +365,11 @@ shaka.test.TestScheme.createManifests = function(shaka, suffix) {
     GENERATORS[name + suffix] = GENERATORS[name + suffix] || {};
     let data = DATA[name];
     [ContentType.VIDEO, ContentType.AUDIO].forEach(function(type) {
-      let streamGen = createStreamGenerator(data[type]);
-      GENERATORS[name + suffix][type] = streamGen;
-      async.push(streamGen.init());
+      if (data[type]) {
+        let streamGen = createStreamGenerator(data[type]);
+        GENERATORS[name + suffix][type] = streamGen;
+        async.push(streamGen.init());
+      }
     });
 
     let gen = new windowShaka.test.ManifestGenerator(shaka)
@@ -364,11 +378,13 @@ shaka.test.TestScheme.createManifests = function(shaka, suffix) {
         .addVariant(0)
           .addVideo(1);
     addStreamInfo(gen, data, ContentType.VIDEO, name);
-    gen.addAudio(2);
-    addStreamInfo(gen, data, ContentType.AUDIO, name);
+    if (data[ContentType.AUDIO]) {
+      gen.addAudio(2);
+      addStreamInfo(gen, data, ContentType.AUDIO, name);
+    }
 
     if (data.text) {
-      // This seems to be necessary.  Otherwise, we end up with a URL like
+      // This seems to be necessary.  Otherwise, we end up with an URL like
       // "http:/base/..." which then fails to load on Safari for some reason.
       let locationUri = new goog.Uri(location.href);
       let partialUri = new goog.Uri(data.text.uri);
@@ -385,13 +401,13 @@ shaka.test.TestScheme.createManifests = function(shaka, suffix) {
   // Custom generators:
 
   let data = DATA['sintel'];
-  let period_duration = 10;
-  let num_periods = 10;
+  let periodDuration = 10;
+  let numPeriods = 10;
   let gen = new windowShaka.test.ManifestGenerator(shaka)
-      .setPresentationDuration(period_duration * num_periods);
+      .setPresentationDuration(periodDuration * numPeriods);
 
-  for (let i = 0; i < num_periods; i++) {
-    gen.addPeriod(period_duration * i);
+  for (let i = 0; i < numPeriods; i++) {
+    gen.addPeriod(periodDuration * i);
 
     gen.addVariant(2 * i).language('en');
     gen.addVideo(4 * i);
@@ -421,7 +437,7 @@ beforeAll(function(done) {
 /**
  * @constructor
  * @struct
- * @implements {shakaExtern.ManifestParser}
+ * @implements {shaka.extern.ManifestParser}
  */
 shaka.test.TestScheme.ManifestParser = function() {};
 

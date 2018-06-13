@@ -1,7 +1,7 @@
 {
   "name": "shaka-player",
   "description": "DASH/EME video player library",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "homepage": "https://github.com/google/shaka-player",
   "author": "Google",
   "maintainers": [
@@ -57,6 +57,6 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "prepublish": "in-publish && python ./build/checkversion.py && python ./build/all.py --force || not-in-publish"
+    "prepublish": "in-publish && python build/checkversion.py && python build/all.py --force || not-in-publish"
   }
 }
