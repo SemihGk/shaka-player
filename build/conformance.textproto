@@ -96,19 +96,6 @@ requirement: {
 
 
 # Disallow console logging.
-requirement: {
-  type: BANNED_PROPERTY_CALL
-  value: 'Console.prototype.debug'
-  value: 'Console.prototype.log'
-  value: 'Console.prototype.info'
-  value: 'Console.prototype.warn'
-  value: 'Console.prototype.error'
-  error_message: 'Using "console" is not allowed; '
-                 'use shaka.log instead'
-  whitelist_regexp: 'demo/'
-  whitelist_regexp: 'third_party/closure/'
-  whitelist_regexp: 'test/test/boot.js'
-}
 
 
 # Disallow Element.children.
