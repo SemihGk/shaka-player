@@ -334,7 +334,7 @@ describe('StreamingEngine', function() {
       onStartupComplete: Util.spyFunc(onStartupComplete)
     };
     streamingEngine = new shaka.media.StreamingEngine(
-        /** @type {shakaExtern.Manifest} */(manifest), playerInterface);
+        /** @type {shakaExtern.Manifest} */(manifest), playerInterface, video);
     streamingEngine.configure(config);
   }
 

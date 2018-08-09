@@ -157,18 +157,7 @@ requirement: {
   error_message: 'ES6 String methods are not allowed '
                  'because they are not supported in IE11'
 }
-requirement: {
-  type: BANNED_PROPERTY
-  value: 'ArrayBuffer.prototype.slice'
-  error_message: 'ArrayBuffer.slice is not allowed because it '
-                 'is not supported on Tizen 2016'
-}
-requirement: {
-  type: BANNED_PROPERTY
-  value: 'TypedArray.prototype.slice'
-  error_message: 'TypedArray.slice is not allowed because it '
-                 'is not supported on IE11'
-}
+
 requirement: {
   type: BANNED_NAME
   value: 'ArrayBuffer.isView'
