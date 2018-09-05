@@ -39,6 +39,7 @@ shaka.extern.ManifestParser = function() {};
 /**
  * @typedef {{
  *   networkingEngine: !shaka.net.NetworkingEngine,
+ *   updateSupportedStreams: function(shaka.extern.Period),
  *   filterNewPeriod: function(shaka.extern.Period),
  *   filterAllPeriods: function(!Array.<!shaka.extern.Period>),
  *   onTimelineRegionAdded: function(shaka.extern.TimelineRegionInfo),
@@ -54,6 +55,8 @@ shaka.extern.ManifestParser = function() {};
  *
  * @property {!shaka.net.NetworkingEngine} networkingEngine
  *   The networking engine to use for network requests.
+ * @property {function(shaka.extern.Period)} updateSupportedStreams
+ *   The drm engine to update for codec supports.
  * @property {function(shaka.extern.Period)} filterNewPeriod
  *   Should be called on a new Period so that it can be filtered.
  * @property {function(!Array.<!shaka.extern.Period>)} filterAllPeriods
